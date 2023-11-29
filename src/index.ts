@@ -8,9 +8,9 @@ export async function activate(context: ExtensionContext) {
   const lan = getLocale()
   const isZh = lan.includes('zh')
 
-  const fixedNameFunc = (files: any) => {
+  const fixedNameFunc = (files: any, isEdit = true) => {
     files.forEach((file: any) => {
-      const { newUri } = file
+      const newUri = isEdit ? file.newUri : file
       const ext = basename(newUri.fsPath)
       if (/\s/.test(ext)) {
         message.error({
@@ -32,7 +32,7 @@ export async function activate(context: ExtensionContext) {
     fixedNameFunc(files)
   }))
   disposes.push(addEventListener('file-create', ({ files }) => {
-    fixedNameFunc(files)
+    fixedNameFunc(files, false)
   }))
 
   context.subscriptions.push(...disposes)
