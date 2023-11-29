@@ -1,7 +1,9 @@
 <p align="center">
-<img height="200" src="./assets/kv.png" alt="to unocss">
+<img height="200" src="./assets/kv.png" alt="File Name Detection">
 </p>
 <p align="center"> <a href="./README.md">English</a> | 简体中文</p>
+
+检测新建文件或者文件重命名后可能存在的空格字符串，给出一个错误的弹窗，并且可以一键修复
 
 ## :coffee:
 
