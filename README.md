@@ -5,6 +5,8 @@
 
 Detect the space string that may exist after the new file or file renaming, give an error pop-up window, and it can be repaired with one click.
 
+![demo](/assets/demo.gif)
+
 ## :coffee:
 
 [buy me a cup of coffee](https://github.com/Simon-He95/sponsor)

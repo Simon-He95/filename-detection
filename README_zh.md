@@ -5,6 +5,8 @@
 
 检测新建文件或者文件重命名后可能存在的空格字符串，给出一个错误的弹窗，并且可以一键修复
 
+![demo](/assets/demo.gif)
+
 ## :coffee:
 
 [请我喝一杯咖啡](https://github.com/Simon-He95/sponsor)
