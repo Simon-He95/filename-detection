@@ -12,6 +12,10 @@ export async function activate(context: ExtensionContext) {
     files.forEach((file: any) => {
       const newUri = isEdit ? file.newUri : file
       const ext = basename(newUri.fsPath)
+      // 如果新增的文件名是复制另一个文件带有copy时候先不做检测，待重命名后检测
+      if (ext.includes(' copy'))
+        return
+
       const fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
 
       if (/\s/.test(ext)) {
