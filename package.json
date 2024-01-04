@@ -33,6 +33,19 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "filename-detection",
+      "properties": {
+        "filename-detection.cSpell": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to turn on the detection file name"
+        }
+      }
+    }
+  },
   "scripts": {
     "dev": "pnpm build --watch",
     "test": "vitest",
@@ -48,15 +61,15 @@
     "@simon_he/eslint-config": "^0.0.6",
     "@types/node": "^18.18.12",
     "@types/vscode": "^1.84.2",
-    "@vscode-use/utils": "^0.0.63",
+    "@vscode-use/utils": "^0.0.76",
     "bumpp": "^9.2.0",
     "eslint": "^8.54.0",
     "esno": "^0.16.3",
-    "get-sponsors-list": "^0.0.4",
     "pnpm": "^8.10.5",
     "rimraf": "^4.4.1",
     "tsup": "^6.7.0",
     "typescript": "^5.3.2",
+    "typo-js": "^1.2.3",
     "vite": "^4.5.0",
     "vitest": "^0.29.8",
     "vsce": "^2.15.0"
