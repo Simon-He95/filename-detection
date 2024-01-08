@@ -67,11 +67,14 @@ export async function activate(context: ExtensionContext) {
         const warningMsgs: string[] = [
           '🚨 文件或目录名中可能存在拼写错误：',
         ]
+        const suggestions = []
         errorNames.forEach((p) => {
           const array_of_suggestions = dictionary.suggest(p)
+          suggestions.push(...array_of_suggestions)
           warningMsgs.push(`💡 ${p} 建议修正为：${array_of_suggestions.join(', ')}`)
         })
-        message.error({ modal: true, message: warningMsgs.join('\n'), buttons: [] })
+        if (suggestions.length)
+          message.warn({ modal: true, message: warningMsgs.join('\n'), buttons: [] })
       })
     })
   }
