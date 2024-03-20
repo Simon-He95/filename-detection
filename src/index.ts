@@ -57,12 +57,12 @@ export async function activate(context: ExtensionContext) {
       const words = (getConfiguration('cSpell.words') || []) as string[]
       if (!isCheck)
         return
-      const errorNames = prefixNames.filter(p => !dictionary.check(p) && !userWords.includes(p) && !words.includes(p))
+      const errorNames = prefixNames
+        .filter(p => !dictionary.check(p) && !userWords.includes(p) && !words.includes(p))
       if (!errorNames.length)
         return
 
       // 读取 cSpell.userWords 和 cSpell.words
-
       Promise.resolve().then(() => {
         const warningMsgs: string[] = [
           '🚨 文件或目录名中可能存在拼写错误：',
@@ -70,6 +70,7 @@ export async function activate(context: ExtensionContext) {
         const suggestions = []
         errorNames.forEach((p) => {
           const array_of_suggestions = dictionary.suggest(p)
+            .filter((s: string) => !p.toLocaleLowerCase().includes(s.toLocaleLowerCase()))
           suggestions.push(...array_of_suggestions)
           warningMsgs.push(`💡 ${p} 建议修正为：${array_of_suggestions.join(', ')}`)
         })
