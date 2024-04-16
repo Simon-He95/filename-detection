@@ -13,6 +13,11 @@ export async function activate(context: ExtensionContext) {
   const dictionary = new Typo('en_US')
   const isCheck = getConfiguration('filename-detection.cSpell') as boolean
   const fixedNameFunc = (files: any, isEdit = true) => {
+    const suggestions = []
+    const warningMsgs: string[] = [
+      '🚨 文件或目录名中可能存在拼写错误：',
+    ]
+    const errorNamesCache = new Set()
     files.forEach((file: any) => {
       const newUri = isEdit ? file.newUri : file
       const ext = basename(newUri.fsPath)
@@ -58,26 +63,21 @@ export async function activate(context: ExtensionContext) {
       if (!isCheck)
         return
       const errorNames = prefixNames
-        .filter(p => !dictionary.check(p) && !userWords.includes(p) && !words.includes(p))
+        .filter(p => !dictionary.check(p) && !userWords.includes(p) && !words.includes(p) && ![...errorNamesCache].includes(p))
       if (!errorNames.length)
         return
 
+      errorNames.forEach(n => errorNamesCache.add(n))
       // 读取 cSpell.userWords 和 cSpell.words
-      Promise.resolve().then(() => {
-        const warningMsgs: string[] = [
-          '🚨 文件或目录名中可能存在拼写错误：',
-        ]
-        const suggestions = []
-        errorNames.forEach((p) => {
-          const array_of_suggestions = dictionary.suggest(p)
-            .filter((s: string) => !p.toLocaleLowerCase().includes(s.toLocaleLowerCase()))
-          suggestions.push(...array_of_suggestions)
-          warningMsgs.push(`💡 ${p} 建议修正为：${array_of_suggestions.join(', ')}`)
-        })
-        if (suggestions.length)
-          message.warn({ modal: true, message: warningMsgs.join('\n'), buttons: [] })
+      errorNames.forEach((p) => {
+        const array_of_suggestions = dictionary.suggest(p)
+          .filter((s: string) => !p.toLocaleLowerCase().includes(s.toLocaleLowerCase()))
+        suggestions.push(...array_of_suggestions)
+        warningMsgs.push(`💡 ${p} 建议修正为：${array_of_suggestions.join(', ')}`)
       })
     })
+    if (suggestions.length)
+      message.warn({ modal: true, message: warningMsgs.join('\n'), buttons: [] })
   }
   disposes.push(addEventListener('rename', ({ files }) => {
     fixedNameFunc(files)
