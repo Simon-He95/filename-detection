@@ -1,7 +1,9 @@
-import { basename } from 'node:path'
-import { addEventListener, getConfiguration, getLocale, message } from '@vscode-use/utils'
+import { basename, resolve } from 'node:path'
+import { nextTick } from 'node:process'
+import { addEventListener, createInput, getConfiguration, getLocale, message, rename } from '@vscode-use/utils'
 import type { Disposable, ExtensionContext } from 'vscode'
 import { Uri, workspace } from 'vscode'
+import fg from 'fast-glob'
 
 const Typo = require('typo-js')
 
@@ -18,12 +20,40 @@ export async function activate(context: ExtensionContext) {
       '🚨 文件或目录名中可能存在拼写错误：',
     ]
     const errorNamesCache = new Set()
-    files.forEach((file: any) => {
+    files.forEach(async (file: any) => {
       const newUri = isEdit ? file.newUri : file
       const ext = basename(newUri.fsPath)
-      // 如果新增的文件名是复制另一个文件带有copy时候先不做检测，待重命名后检测
-      if (ext.includes(' copy'))
-        return
+      // 如果新增的文件名是复制另一个文件带有copy时候先不做检测，直接弹出修改文件名的输入选项
+      if (ext.includes(' copy')) {
+        // 读取当前目录下的所有文件名
+        const entry = (await fg(['./*', './*.*'], { cwd: resolve(newUri.fsPath, '..') })).filter(e => e !== ext)
+
+        return createInput({
+          title: '输入修改文件名',
+          placeHolder: '请输入修改文件名',
+          value: '',
+          prompt: ext.replace(/ copy[^.]*/, ''),
+          validate(value) {
+            if (!value)
+              return '文件名不能为空'
+
+            if (/\s/.test(value))
+              return '文件名不能包含空格'
+
+            if (zero_character_reg.test(value))
+              return '文件名不能包含零宽字符'
+
+            if (entry.includes(value))
+              return '文件名冲突'
+            return null
+          },
+        }).then((newName: any) => {
+          const newUrl = Uri.file((resolve(newUri.fsPath, '..', newName)))
+          nextTick(() => {
+            rename(newUri, newUrl)
+          })
+        })
+      }
       const fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
       if (/\s/.test(ext)) {
         message.error({
