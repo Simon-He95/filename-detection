@@ -27,12 +27,12 @@ export async function activate(context: ExtensionContext) {
       if (ext.includes(' copy')) {
         // 读取当前目录下的所有文件名
         const entry = (await fg(['./*', './*.*'], { cwd: resolve(newUri.fsPath, '..') })).filter(e => e !== ext)
-
+        const suffix = ext.includes('.') ? `.${ext.split('.').slice(-1)[0]}` : ''
         return createInput({
-          title: '输入修改文件名',
+          title: `输入修改文件名(${suffix || ''})`,
           placeHolder: '请输入修改文件名',
-          value: '',
-          prompt: ext.replace(/ copy[^.]*/, ''),
+          value: ext.replace(/ copy.*/, ''),
+          prompt: ext.replace(/ copy.*/, ''),
           validate(value) {
             if (!value)
               return '文件名不能为空'
@@ -43,12 +43,13 @@ export async function activate(context: ExtensionContext) {
             if (zero_character_reg.test(value))
               return '文件名不能包含零宽字符'
 
-            if (entry.includes(value))
+            if (entry.includes(value + suffix))
               return '文件名冲突'
             return null
           },
         }).then((newName: any) => {
-          const newUrl = Uri.file((resolve(newUri.fsPath, '..', newName)))
+          const exactValue = newName + suffix
+          const newUrl = Uri.file((resolve(newUri.fsPath, '..', exactValue)))
           nextTick(() => {
             rename(newUri, newUrl)
           })
