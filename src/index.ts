@@ -14,25 +14,27 @@ export async function activate(context: ExtensionContext) {
   const zero_character_reg = /\p{Cf}/gu
   const dictionary = new Typo('en_US')
   const isCheck = getConfiguration('filename-detection.cSpell') as boolean
-  const fixedNameFunc = (files: any, isEdit = true) => {
+  const fixedNameFunc = async (files: any, isEdit = true) => {
     const suggestions = []
     const warningMsgs: string[] = [
       '🚨 文件或目录名中可能存在拼写错误：',
     ]
     const errorNamesCache = new Set()
-    files.forEach(async (file: any) => {
+    const isOneFile = files.length === 1
+    for (const file of files) {
       const newUri = isEdit ? file.newUri : file
-      const ext = basename(newUri.fsPath)
+      let ext = basename(newUri.fsPath)
       // 如果新增的文件名是复制另一个文件带有copy时候先不做检测，直接弹出修改文件名的输入选项
-      if (ext.includes(' copy')) {
+      if (ext.includes(' copy') || isOneFile) {
         // 读取当前目录下的所有文件名
         const entry = (await fg(['./*', './*.*'], { cwd: resolve(newUri.fsPath, '..') })).filter(e => e !== ext)
         const suffix = ext.includes('.') ? `.${ext.split('.').slice(-1)[0]}` : ''
-        return createInput({
+        const value = ext.replace(/ copy.*/, '').replace(new RegExp(`\\${suffix}$`), '')
+        const newName = await createInput({
           title: `输入修改文件名(${suffix || ''})`,
           placeHolder: '请输入修改文件名',
-          value: ext.replace(/ copy.*/, ''),
-          prompt: ext.replace(/ copy.*/, ''),
+          value,
+          prompt: value,
           validate(value) {
             if (!value)
               return '文件名不能为空'
@@ -47,12 +49,12 @@ export async function activate(context: ExtensionContext) {
               return '文件名冲突'
             return null
           },
-        }).then((newName: any) => {
-          const exactValue = newName + suffix
-          const newUrl = Uri.file((resolve(newUri.fsPath, '..', exactValue)))
-          nextTick(() => {
-            rename(newUri, newUrl)
-          })
+        })
+        const exactValue = newName ? newName + suffix : ext
+        ext = exactValue
+        const newUrl = Uri.file((resolve(newUri.fsPath, '..', exactValue)))
+        nextTick(() => {
+          rename(newUri, newUrl)
         })
       }
       const fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
@@ -106,7 +108,8 @@ export async function activate(context: ExtensionContext) {
         suggestions.push(...array_of_suggestions)
         warningMsgs.push(`💡 ${p} 建议修正为：${array_of_suggestions.join(', ')}`)
       })
-    })
+    }
+
     if (suggestions.length)
       message.warn({ modal: true, message: warningMsgs.join('\n'), buttons: [] })
   }
