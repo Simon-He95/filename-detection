@@ -20,12 +20,12 @@ export async function activate(context: ExtensionContext) {
       '🚨 文件或目录名中可能存在拼写错误：',
     ]
     const errorNamesCache = new Set()
-    const isOneFile = files.length === 1
+    // const isOneFile = files.length === 1
     for (const file of files) {
       const newUri = isEdit ? file.newUri : file
       let ext = basename(newUri.fsPath)
       // 如果新增的文件名是复制另一个文件带有copy时候先不做检测，直接弹出修改文件名的输入选项
-      if (ext.includes(' copy') || isOneFile) {
+      if (ext.includes(' copy')) {
         // 读取当前目录下的所有文件名
         const entry = (await fg(['./*', './*.*'], { cwd: resolve(newUri.fsPath, '..') })).filter(e => e !== ext)
         const suffix = ext.includes('.') ? `.${ext.split('.').slice(-1)[0]}` : ''
