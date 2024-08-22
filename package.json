@@ -3,7 +3,7 @@
   "name": "filename-detection",
   "displayName": "File Name Detection",
   "version": "0.0.13",
-  "packageManager": "pnpm@8.10.5",
+  "packageManager": "pnpm@8.15.9",
   "description": "filename-detection",
   "author": "Simon He <https://github.com/Simon-He95>",
   "license": "MIT",
@@ -24,11 +24,8 @@
   ],
   "main": "./dist/index.js",
   "icon": "icon.png",
-  "files": [
-    "dist"
-  ],
   "engines": {
-    "vscode": "^1.84.2"
+    "vscode": "^1.92.0"
   },
   "activationEvents": [
     "onStartupFinished"
@@ -58,21 +55,22 @@
     "release": "bumpp && pnpm run publish"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^2.14.0",
-    "@types/node": "^18.18.12",
-    "@types/vscode": "^1.84.2",
+    "@antfu/eslint-config": "^2.27.0",
+    "@simon_he/translate": "^0.0.6",
+    "@types/node": "^18.19.45",
+    "@types/vscode": "^1.92.0",
     "@vscode-use/utils": "^0.0.93",
-    "bumpp": "^9.2.0",
-    "eslint": "^8.54.0",
+    "@vscode/vsce": "^3.0.0",
+    "bumpp": "^9.5.1",
+    "eslint": "^8.57.0",
     "esno": "^0.16.3",
     "fast-glob": "^3.3.2",
-    "pnpm": "^8.10.5",
+    "lazy-js-utils": "^0.0.99",
+    "pnpm": "^8.15.9",
     "rimraf": "^4.4.1",
     "tsup": "^6.7.0",
-    "typescript": "^5.3.2",
-    "typo-js": "^1.2.3",
-    "vite": "^4.5.0",
-    "vitest": "^0.29.8",
-    "vsce": "^2.15.0"
+    "typescript": "^5.5.4",
+    "typo-js": "^1.2.4",
+    "vitest": "^0.29.8"
   }
 }

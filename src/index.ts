@@ -1,9 +1,11 @@
 import { basename, resolve } from 'node:path'
 import { nextTick } from 'node:process'
-import { addEventListener, createInput, getConfiguration, getLocale, message, rename } from '@vscode-use/utils'
+import { addEventListener, createInput, createSelect, getConfiguration, getLocale, message, rename } from '@vscode-use/utils'
 import type { Disposable, ExtensionContext } from 'vscode'
-import { Uri, workspace } from 'vscode'
+import { Uri } from 'vscode'
 import fg from 'fast-glob'
+import { camelize, isContainCn } from 'lazy-js-utils'
+import translateLoader from '@simon_he/translate'
 
 const Typo = require('typo-js')
 
@@ -30,7 +32,7 @@ export async function activate(context: ExtensionContext) {
         const entry = (await fg(['./*', './*.*'], { cwd: resolve(newUri.fsPath, '..') })).filter(e => e !== ext)
         const suffix = ext.includes('.') ? `.${ext.split('.').slice(-1)[0]}` : ''
         const value = ext.replace(/ copy.*/, '').replace(new RegExp(`\\${suffix}$`), '')
-        const newName = await createInput({
+        let newName = await createInput({
           title: `输入修改文件名(${suffix || ''})`,
           placeHolder: '请输入修改文件名',
           value,
@@ -50,6 +52,21 @@ export async function activate(context: ExtensionContext) {
             return null
           },
         })
+        // 如果输入的名字是中文，则转换为英文，并提供几种组合选择
+        if (newName && isContainCn(newName)) {
+          const exts = (await chineseToEnglish(newName))[0].split(' ').map(item => item.toLocaleLowerCase())
+          // 提供驼峰和hyphen的选择
+          const hyphenExtName = exts.join('-')
+          const lowHyphenExtName = exts.join('_')
+          const camelExtName = camelize(hyphenExtName)
+          newName = await createSelect([
+            hyphenExtName,
+            lowHyphenExtName,
+            camelExtName,
+          ], {
+            title: '请选择需要的命名',
+          })
+        }
         const exactValue = newName ? newName + suffix : ext
         ext = exactValue
         const newUrl = Uri.file((resolve(newUri.fsPath, '..', exactValue)))
@@ -64,7 +81,7 @@ export async function activate(context: ExtensionContext) {
           buttons: isZh ? '修复' : 'Repair',
         }).then(async (v) => {
           if (v) {
-            workspace.fs.rename(newUri, Uri.file(newUri.fsPath.replace(ext, fixedName)))
+            rename(newUri, Uri.file(newUri.fsPath.replace(ext, fixedName)))
               .then(() => {
                 message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${fixedName}]`)
               })
@@ -78,12 +95,33 @@ export async function activate(context: ExtensionContext) {
           buttons: isZh ? '修复' : 'Repair',
         }).then(async (v) => {
           if (v) {
-            workspace.fs.rename(newUri, Uri.file(newUri.fsPath.replace(ext, fixedName)))
+            rename(newUri, Uri.file(newUri.fsPath.replace(ext, fixedName)))
               .then(() => {
                 message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${fixedName}]`)
               })
           }
         })
+        return
+      }
+      else if (isContainCn(ext)) {
+        const exts = (await chineseToEnglish(ext))[0].split(' ').map(item => item.toLocaleLowerCase())
+        // 提供驼峰和hyphen的选择
+        const hyphenExtName = exts.join('-')
+        const lowHyphenExtName = exts.join('_')
+        const camelExtName = camelize(hyphenExtName)
+        const newExtName = await createSelect([
+          hyphenExtName,
+          lowHyphenExtName,
+          camelExtName,
+        ], {
+          title: '请选择需要的命名',
+        })
+        if (newExtName) {
+          rename(newUri, Uri.file(newUri.fsPath.replace(ext, newExtName)))
+            .then(() => {
+              message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${newExtName}]`)
+            })
+        }
         return
       }
 
@@ -125,4 +163,13 @@ export async function activate(context: ExtensionContext) {
 
 export function deactivate() {
 
+}
+const translate = translateLoader()
+
+async function chineseToEnglish(name: string) {
+  // 如果输入的名字是中文，则转换为英文，并提供几种组合选择
+  if (!isContainCn(name)) {
+    return name
+  }
+  return await translate(name, 'en')
 }

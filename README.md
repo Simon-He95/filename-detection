@@ -5,6 +5,10 @@
 
 Detect the space string that may exist after the new file or file rename, give an error pop-up window, and it can be repaired with one click. It is added to detect whether the English word spelling of the file name is correct. This keyword will read the user's user and workspace settings and the words deemed reasonable.
 
+## New features 🚀
+
+- Supports Chinese naming, automatic translation provides the best choice conversion
+
 ![demo](/assets/demo.gif)
 
 ## :coffee:
