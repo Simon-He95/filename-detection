@@ -21,8 +21,8 @@ importers:
         specifier: ^1.92.0
         version: 1.92.0
       '@vscode-use/utils':
-        specifier: ^0.0.93
-        version: 0.0.93
+        specifier: ^0.1.27
+        version: 0.1.27
       '@vscode/vsce':
         specifier: ^3.0.0
         version: 3.0.0
@@ -733,9 +733,9 @@ packages:
   '@vitest/utils@0.29.8':
     resolution: {integrity: sha512-qGzuf3vrTbnoY+RjjVVIBYfuWMjn3UMUqyQtdGNZ6ZIIyte7B37exj6LaVkrZiUTvzSadVvO/tJm8AEgbGCBPg==}
 
-  '@vscode-use/utils@0.0.93':
-    resolution: {integrity: sha512-DBkjl6w5mn5rzkFiGTe+xxX57lTnMB8Mjq1e8f49IM6eqEjDZxprC5QVtZWhoUVfvrUTr8en5JJjFEeqr3uUqA==}
-    engines: {vscode: ^1.77.0}
+  '@vscode-use/utils@0.1.27':
+    resolution: {integrity: sha512-6U8s9q6CrCAeH8/No1G+q9lBRC8kRtlGK9d1n6xj4ctXHaSfdOJD1BshRn2cDKasuWLS6FJxc8p41/NJ42oaTQ==}
+    engines: {vscode: ^1.92.0}
 
   '@vscode/vsce-sign-alpine-arm64@2.0.2':
     resolution: {integrity: sha512-E80YvqhtZCLUv3YAf9+tIbbqoinWLCO/B3j03yQPbjT3ZIHCliKZlsy1peNc4XNZ5uIb87Jn0HWx/ZbPXviuAQ==}
@@ -3898,7 +3898,7 @@ snapshots:
       loupe: 2.3.6
       pretty-format: 27.5.1
 
-  '@vscode-use/utils@0.0.93': {}
+  '@vscode-use/utils@0.1.27': {}
 
   '@vscode/vsce-sign-alpine-arm64@2.0.2':
     optional: true

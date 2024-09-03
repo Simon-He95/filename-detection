@@ -1,6 +1,6 @@
 import { basename, resolve } from 'node:path'
 import { nextTick } from 'node:process'
-import { addEventListener, createInput, createSelect, getConfiguration, getLocale, message, rename } from '@vscode-use/utils'
+import { addEventListener, createFakeProgress, createInput, createSelect, getConfiguration, getLocale, message, rename } from '@vscode-use/utils'
 import type { Disposable, ExtensionContext } from 'vscode'
 import { Uri } from 'vscode'
 import fg from 'fast-glob'
@@ -54,22 +54,38 @@ export async function activate(context: ExtensionContext) {
         })
         // 如果输入的名字是中文，则转换为英文，并提供几种组合选择
         if (newName && isContainCn(newName)) {
-          const exts = (await chineseToEnglish(newName))[0].split(' ').map(item => item.toLocaleLowerCase())
-          // 提供驼峰和hyphen的选择
-          const hyphenExtName = exts.join('-')
-          const lowHyphenExtName = exts.join('_')
-          const camelExtName = camelize(hyphenExtName)
-          const selectOptions = [...new Set([
-            hyphenExtName,
-            lowHyphenExtName,
-            camelExtName,
-          ])]
+          let resolver!: (value: unknown) => void
+          let rejector!: (msg: string) => void
+          createFakeProgress({
+            title: '正在翻译中文文件名',
+            callback(resolve, _reject) {
+              resolver = resolve
+              rejector = _reject
+            },
+            message: increment => `当前进度 ${increment}%`,
+          })
+          try {
+            const exts = (await chineseToEnglish(newName))[0].split(' ').map(item => item.toLocaleLowerCase())
+            resolver(true)
+            // 提供驼峰和hyphen的选择
+            const hyphenExtName = exts.join('-')
+            const lowHyphenExtName = exts.join('_')
+            const camelExtName = camelize(hyphenExtName)
+            const selectOptions = [...new Set([
+              hyphenExtName,
+              lowHyphenExtName,
+              camelExtName,
+            ])]
 
-          newName = selectOptions.length > 1
-            ? await createSelect(selectOptions, {
-              title: '请选择需要的命名',
-            })
-            : selectOptions[0]
+            newName = selectOptions.length > 1
+              ? await createSelect(selectOptions, {
+                title: '请选择需要的命名',
+              })
+              : selectOptions[0]
+          }
+          catch (error) {
+            rejector(JSON.stringify(error))
+          }
         }
         const exactValue = newName ? newName + suffix : ext
         ext = exactValue
@@ -108,28 +124,45 @@ export async function activate(context: ExtensionContext) {
         return
       }
       else if (isContainCn(ext)) {
-        const exts = (await chineseToEnglish(ext))[0].split(' ').map(item => item.toLocaleLowerCase())
-        // 提供驼峰和hyphen的选择
-        const hyphenExtName = exts.join('-')
-        const lowHyphenExtName = exts.join('_')
-        const camelExtName = camelize(hyphenExtName)
-        const selectOptions = [...new Set([
-          hyphenExtName,
-          lowHyphenExtName,
-          camelExtName,
-        ])]
+        let resolver!: (value: unknown) => void
+        let rejector!: (msg: string) => void
+        createFakeProgress({
+          title: '正在翻译中文文件名',
+          callback(resolve, _reject) {
+            resolver = resolve
+            rejector = _reject
+          },
+          message: increment => `当前进度 ${increment}%`,
+        })
+        try {
+          const exts = (await chineseToEnglish(ext))[0].split(' ').map(item => item.toLocaleLowerCase())
+          resolver(true)
+          // 提供驼峰和hyphen的选择
+          const hyphenExtName = exts.join('-')
+          const lowHyphenExtName = exts.join('_')
+          const camelExtName = camelize(hyphenExtName)
+          const selectOptions = [...new Set([
+            hyphenExtName,
+            lowHyphenExtName,
+            camelExtName,
+          ])]
 
-        const newExtName = selectOptions.length > 1
-          ? await createSelect(selectOptions, {
-            title: '请选择需要的命名',
-          })
-          : selectOptions[0]
-        if (newExtName) {
-          rename(newUri, Uri.file(newUri.fsPath.replace(ext, newExtName)))
-            .then(() => {
-              message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${newExtName}]`)
+          const newExtName = selectOptions.length > 1
+            ? await createSelect(selectOptions, {
+              title: '请选择需要的命名',
             })
+            : selectOptions[0]
+          if (newExtName) {
+            rename(newUri, Uri.file(newUri.fsPath.replace(ext, newExtName)))
+              .then(() => {
+                message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${newExtName}]`)
+              })
+          }
         }
+        catch (error) {
+          rejector(String(error))
+        }
+
         return
       }
 

@@ -59,7 +59,7 @@
     "@simon_he/translate": "^0.0.6",
     "@types/node": "^18.19.45",
     "@types/vscode": "^1.92.0",
-    "@vscode-use/utils": "^0.0.93",
+    "@vscode-use/utils": "^0.1.27",
     "@vscode/vsce": "^3.0.0",
     "bumpp": "^9.5.1",
     "eslint": "^8.57.0",
