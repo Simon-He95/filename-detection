@@ -59,13 +59,17 @@ export async function activate(context: ExtensionContext) {
           const hyphenExtName = exts.join('-')
           const lowHyphenExtName = exts.join('_')
           const camelExtName = camelize(hyphenExtName)
-          newName = await createSelect([
+          const selectOptions = [...new Set([
             hyphenExtName,
             lowHyphenExtName,
             camelExtName,
-          ], {
-            title: '请选择需要的命名',
-          })
+          ])]
+
+          newName = selectOptions.length > 1
+            ? await createSelect(selectOptions, {
+              title: '请选择需要的命名',
+            })
+            : selectOptions[0]
         }
         const exactValue = newName ? newName + suffix : ext
         ext = exactValue
@@ -109,13 +113,17 @@ export async function activate(context: ExtensionContext) {
         const hyphenExtName = exts.join('-')
         const lowHyphenExtName = exts.join('_')
         const camelExtName = camelize(hyphenExtName)
-        const newExtName = await createSelect([
+        const selectOptions = [...new Set([
           hyphenExtName,
           lowHyphenExtName,
           camelExtName,
-        ], {
-          title: '请选择需要的命名',
-        })
+        ])]
+
+        const newExtName = selectOptions.length > 1
+          ? await createSelect(selectOptions, {
+            title: '请选择需要的命名',
+          })
+          : selectOptions[0]
         if (newExtName) {
           rename(newUri, Uri.file(newUri.fsPath.replace(ext, newExtName)))
             .then(() => {
