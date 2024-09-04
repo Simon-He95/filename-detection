@@ -68,20 +68,7 @@ export async function activate(context: ExtensionContext) {
             const exts = (await chineseToEnglish(newName))[0].split(' ').map(item => item.toLocaleLowerCase())
             resolver(true)
             // 提供驼峰和hyphen的选择
-            const hyphenExtName = exts.join('-')
-            const lowHyphenExtName = exts.join('_')
-            const camelExtName = camelize(hyphenExtName)
-            const selectOptions = [...new Set([
-              hyphenExtName,
-              lowHyphenExtName,
-              camelExtName,
-            ])]
-
-            newName = selectOptions.length > 1
-              ? await createSelect(selectOptions, {
-                title: '请选择需要的命名',
-              })
-              : selectOptions[0]
+            newName = await getNewExtName(exts)
           }
           catch (error) {
             rejector(JSON.stringify(error))
@@ -138,20 +125,7 @@ export async function activate(context: ExtensionContext) {
           const exts = (await chineseToEnglish(ext))[0].split(' ').map(item => item.toLocaleLowerCase())
           resolver(true)
           // 提供驼峰和hyphen的选择
-          const hyphenExtName = exts.join('-')
-          const lowHyphenExtName = exts.join('_')
-          const camelExtName = camelize(hyphenExtName)
-          const selectOptions = [...new Set([
-            hyphenExtName,
-            lowHyphenExtName,
-            camelExtName,
-          ])]
-
-          const newExtName = selectOptions.length > 1
-            ? await createSelect(selectOptions, {
-              title: '请选择需要的命名',
-            })
-            : selectOptions[0]
+          const newExtName = await getNewExtName(exts)
           if (newExtName) {
             rename(newUri, Uri.file(newUri.fsPath.replace(ext, newExtName)))
               .then(() => {
@@ -213,4 +187,23 @@ async function chineseToEnglish(name: string) {
     return name
   }
   return await translate(name, 'en')
+}
+
+async function getNewExtName(exts: string[]) {
+  const hyphenExtName = exts.join('-')
+  const lowHyphenExtName = exts.join('_')
+  const camelExtName = camelize(hyphenExtName)
+  const bigCamelExtName = camelExtName[0].toLocaleUpperCase() + camelExtName.slice(1)
+  const selectOptions = [...new Set([
+    hyphenExtName,
+    lowHyphenExtName,
+    camelExtName,
+    bigCamelExtName,
+  ])]
+
+  return selectOptions.length > 1
+    ? await createSelect(selectOptions, {
+      title: '请选择需要的命名',
+    })
+    : selectOptions[0]
 }
