@@ -1,5 +1,6 @@
 import { basename, resolve } from 'node:path'
 import { nextTick } from 'node:process'
+import fs from 'node:fs'
 import { addEventListener, createFakeProgress, createInput, createSelect, getConfiguration, getLocale, message, rename } from '@vscode-use/utils'
 import type { Disposable, ExtensionContext } from 'vscode'
 import { Uri } from 'vscode'
@@ -53,26 +54,37 @@ export async function activate(context: ExtensionContext) {
           },
         })
         // 如果输入的名字是中文，则转换为英文，并提供几种组合选择
-        if (newName && isContainCn(newName)) {
-          let resolver!: (value: unknown) => void
-          let rejector!: (msg: string) => void
-          createFakeProgress({
-            title: '正在翻译中文文件名',
-            callback(resolve, _reject) {
-              resolver = resolve
-              rejector = _reject
-            },
-            message: increment => `当前进度 ${increment}%`,
+        if (newName) {
+          if (isContainCn(newName)) {
+            let resolver!: (value: unknown) => void
+            let rejector!: (msg: string) => void
+            createFakeProgress({
+              title: '正在翻译中文文件名',
+              callback(resolve, _reject) {
+                resolver = resolve
+                rejector = _reject
+              },
+              message: increment => `当前进度 ${increment}%`,
+            })
+            try {
+              const exts = (await chineseToEnglish(newName))[0].split(' ').map(item => item.toLocaleLowerCase())
+              resolver(true)
+              // 提供驼峰和hyphen的选择
+              newName = await getNewExtName(exts)
+            }
+            catch (error) {
+              rejector(JSON.stringify(error))
+            }
+          }
+        }
+        else {
+          // 如果取消了，直接删掉 copy 文件
+          fs.unlink(newUri.fsPath, (err) => {
+            if (err) {
+              message.error(err.message)
+            }
           })
-          try {
-            const exts = (await chineseToEnglish(newName))[0].split(' ').map(item => item.toLocaleLowerCase())
-            resolver(true)
-            // 提供驼峰和hyphen的选择
-            newName = await getNewExtName(exts)
-          }
-          catch (error) {
-            rejector(JSON.stringify(error))
-          }
+          return
         }
         const exactValue = newName ? newName + suffix : ext
         ext = exactValue
