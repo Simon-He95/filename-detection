@@ -79,6 +79,10 @@ export async function activate(context: ExtensionContext) {
         }
         else {
           // 如果取消了，直接删掉 copy 文件
+          // 可能文件被用户删除了,判断文件是否存在
+          if (!fs.existsSync(newUri.fsPath)) {
+            return
+          }
           fs.unlink(newUri.fsPath, (err) => {
             if (err) {
               message.error(err.message)
