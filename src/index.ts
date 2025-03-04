@@ -27,6 +27,120 @@ export async function activate(context: ExtensionContext) {
     for (const file of files) {
       const newUri = isEdit ? file.newUri : file
       let ext = basename(newUri.fsPath)
+      const dirPath = newUri.fsPath.substring(0, newUri.fsPath.length - ext.length)
+
+      // 定义fixedName变量以确保在所有代码路径中都可用
+      let fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
+
+      // 检测是否需要处理父目录路径
+      const checkPathSegments = () => {
+        // 如果basename没有需要转换的问题，检查父路径是否有问题
+        if (!isContainCn(ext) && !zero_character_reg.test(ext) && !(/\s/.test(ext))) {
+          // 获取倒数第二级目录名
+          const parentDir = basename(dirPath.slice(0, -1)) // 移除尾部斜杠
+          if (parentDir && (isContainCn(parentDir) || zero_character_reg.test(parentDir) || /\s/.test(parentDir))) {
+            // 创建父目录的URI对象
+            const parentUri = Uri.file(dirPath.slice(0, -1))
+
+            // 直接处理父目录，无需用户点击
+            if (isContainCn(parentDir)) {
+              // 处理中文目录名
+              handleChineseDirectory(parentUri, parentDir)
+            }
+            else if (zero_character_reg.test(parentDir)) {
+              // 处理带零宽字符的目录名
+              handleZeroWidthDirectory(parentUri, parentDir)
+            }
+            else if (/\s/.test(parentDir)) {
+              // 处理带空格的目录名
+              handleSpaceDirectory(parentUri, parentDir)
+            }
+          }
+        }
+      }
+
+      // 处理中文目录名的函数
+      async function handleChineseDirectory(uri: Uri, dirName: string) {
+        let resolver!: (value: unknown) => void
+        let rejector!: (msg: string) => void
+        createFakeProgress({
+          title: '正在翻译中文目录名',
+          callback(resolve, _reject) {
+            resolver = resolve
+            rejector = _reject
+          },
+          message: increment => `当前进度 ${increment}%`,
+        })
+        try {
+          const exts = (await chineseToEnglish(dirName))[0].split(' ').map(item => item.toLocaleLowerCase())
+          resolver(true)
+          // 提供驼峰和hyphen的选择
+          const newDirName = await getNewExtName(exts)
+          if (newDirName) {
+            // 获取父目录路径 - 这里是关键的修改点
+            const parentPath = uri.fsPath.substring(0, uri.fsPath.lastIndexOf('/')) // 找到父目录
+            const newPath = Uri.file(`${parentPath}/${newDirName}`) // 构建新路径
+
+            try {
+              await rename(uri, newPath)
+              message.info(`${isZh ? '已将目录名' : 'The directory name has been'}：[${dirName}] -> [${newDirName}]`)
+            }
+            catch (error) {
+              message.error(`${isZh ? '重命名目录失败' : 'Failed to rename directory'}: ${String(error)}`)
+            }
+          }
+        }
+        catch (error) {
+          rejector(String(error))
+        }
+      }
+
+      // 处理带零宽字符的目录名
+      function handleZeroWidthDirectory(uri: Uri, dirName: string) {
+        const fixedDirName = dirName.replace(zero_character_reg, '')
+        message.error({
+          message: `${dirName} ${isZh ? '目录名中存在零宽字符,是否自动修复？' : 'There are zero-width characters in the directory name, auto fix?'}`,
+          buttons: isZh ? '修复' : 'Repair',
+        }).then(async (v) => {
+          if (v) {
+            // 获取父目录路径 - 这里是关键的修改点
+            const parentPath = uri.fsPath.substring(0, uri.fsPath.lastIndexOf('/')) // 找到父目录
+            const newPath = Uri.file(`${parentPath}/${fixedDirName}`) // 构建新路径
+
+            try {
+              await rename(uri, newPath)
+              message.info(`${isZh ? '已将目录名' : 'The directory name has been'}：[${dirName}] -> [${fixedDirName}]`)
+            }
+            catch (error) {
+              message.error(`${isZh ? '重命名目录失败' : 'Failed to rename directory'}: ${String(error)}`)
+            }
+          }
+        })
+      }
+
+      // 处理带空格的目录名
+      function handleSpaceDirectory(uri: Uri, dirName: string) {
+        const fixedDirName = dirName.replace(/\s/g, '')
+        message.error({
+          message: `${dirName} ${isZh ? '目录名中存在空格,是否自动修复删除空格？' : 'There are spaces in the directory name, auto fix?'}`,
+          buttons: isZh ? '修复' : 'Repair',
+        }).then(async (v) => {
+          if (v) {
+            // 获取父目录路径 - 这里是关键的修改点
+            const parentPath = uri.fsPath.substring(0, uri.fsPath.lastIndexOf('/')) // 找到父目录
+            const newPath = Uri.file(`${parentPath}/${fixedDirName}`) // 构建新路径
+
+            try {
+              await rename(uri, newPath)
+              message.info(`${isZh ? '已将目录名' : 'The directory name has been'}：[${dirName}] -> [${fixedDirName}]`)
+            }
+            catch (error) {
+              message.error(`${isZh ? '重命名目录失败' : 'Failed to rename directory'}: ${String(error)}`)
+            }
+          }
+        })
+      }
+
       // 如果新增的文件名是复制另一个文件带有copy时候先不做检测，直接弹出修改文件名的输入选项
       if (ext.includes(' copy')) {
         // 读取当前目录下的所有文件名
@@ -92,68 +206,76 @@ export async function activate(context: ExtensionContext) {
         }
         const exactValue = newName ? newName + suffix : ext
         ext = exactValue
+        // 更新fixedName以确保拼写检查能正确工作
+        fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
         const newUrl = Uri.file((resolve(newUri.fsPath, '..', exactValue)))
         nextTick(() => {
           rename(newUri, newUrl)
         })
       }
-      const fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
-      if (/\s/.test(ext)) {
-        message.error({
-          message: `${ext} ${isZh ? '命名中存在空格,是否自动修复删除空格？' : 'If there is a space in the name, will the space be automatically repaired and deleted?'}`,
-          buttons: isZh ? '修复' : 'Repair',
-        }).then(async (v) => {
-          if (v) {
-            rename(newUri, Uri.file(newUri.fsPath.replace(ext, fixedName)))
-              .then(() => {
-                message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${fixedName}]`)
-              })
-          }
-        })
-        return
-      }
-      else if (zero_character_reg.test(ext)) {
-        message.error({
-          message: `${ext} ${isZh ? '命名中存在零宽字符,是否自动修复删除空格？' : 'There are zero-width characters in the name, does it automatically repair and delete spaces?'}`,
-          buttons: isZh ? '修复' : 'Repair',
-        }).then(async (v) => {
-          if (v) {
-            rename(newUri, Uri.file(newUri.fsPath.replace(ext, fixedName)))
-              .then(() => {
-                message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${fixedName}]`)
-              })
-          }
-        })
-        return
-      }
-      else if (isContainCn(ext)) {
-        let resolver!: (value: unknown) => void
-        let rejector!: (msg: string) => void
-        createFakeProgress({
-          title: '正在翻译中文文件名',
-          callback(resolve, _reject) {
-            resolver = resolve
-            rejector = _reject
-          },
-          message: increment => `当前进度 ${increment}%`,
-        })
-        try {
-          const exts = (await chineseToEnglish(ext))[0].split(' ').map(item => item.toLocaleLowerCase())
-          resolver(true)
-          // 提供驼峰和hyphen的选择
-          const newExtName = await getNewExtName(exts)
-          if (newExtName) {
-            rename(newUri, Uri.file(newUri.fsPath.replace(ext, newExtName)))
-              .then(() => {
-                message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${newExtName}]`)
-              })
-          }
+      else {
+        const fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
+        if (/\s/.test(ext)) {
+          message.error({
+            message: `${ext} ${isZh ? '命名中存在空格,是否自动修复删除空格？' : 'If there is a space in the name, will the space be automatically repaired and deleted?'}`,
+            buttons: isZh ? '修复' : 'Repair',
+          }).then(async (v) => {
+            if (v) {
+              rename(newUri, Uri.file(newUri.fsPath.replace(ext, fixedName)))
+                .then(() => {
+                  message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${fixedName}]`)
+                })
+            }
+          })
+          return
         }
-        catch (error) {
-          rejector(String(error))
+        else if (zero_character_reg.test(ext)) {
+          message.error({
+            message: `${ext} ${isZh ? '命名中存在零宽字符,是否自动修复删除空格？' : 'There are zero-width characters in the name, does it automatically repair and delete spaces?'}`,
+            buttons: isZh ? '修复' : 'Repair',
+          }).then(async (v) => {
+            if (v) {
+              rename(newUri, Uri.file(newUri.fsPath.replace(ext, fixedName)))
+                .then(() => {
+                  message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${fixedName}]`)
+                })
+            }
+          })
+          return
         }
+        else if (isContainCn(ext)) {
+          let resolver!: (value: unknown) => void
+          let rejector!: (msg: string) => void
+          createFakeProgress({
+            title: '正在翻译中文文件名',
+            callback(resolve, _reject) {
+              resolver = resolve
+              rejector = _reject
+            },
+            message: increment => `当前进度 ${increment}%`,
+          })
+          try {
+            const exts = (await chineseToEnglish(ext))[0].split(' ').map(item => item.toLocaleLowerCase())
+            resolver(true)
+            // 提供驼峰和hyphen的选择
+            const newExtName = await getNewExtName(exts)
+            if (newExtName) {
+              rename(newUri, Uri.file(newUri.fsPath.replace(ext, newExtName)))
+                .then(() => {
+                  message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${newExtName}]`)
+                })
+            }
+          }
+          catch (error) {
+            rejector(String(error))
+          }
 
-        return
+          return
+        }
+        else {
+          // 如果当前basename没有问题，检查父目录
+          checkPathSegments()
+        }
       }
 
       const splitNames = fixedName.split('.')
