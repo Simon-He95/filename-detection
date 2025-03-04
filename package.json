@@ -25,7 +25,7 @@
   "main": "./dist/index.js",
   "icon": "icon.png",
   "engines": {
-    "vscode": "^1.93.0"
+    "vscode": "^1.77.0"
   },
   "activationEvents": [
     "onStartupFinished"
@@ -57,20 +57,20 @@
   "devDependencies": {
     "@antfu/eslint-config": "^2.27.3",
     "@simon_he/translate": "^0.0.6",
-    "@types/node": "^18.19.53",
-    "@types/vscode": "^1.93.0",
-    "@vscode-use/utils": "^0.1.30",
-    "@vscode/vsce": "^3.1.0",
-    "bumpp": "^9.5.2",
+    "@types/node": "^18.19.79",
+    "@types/vscode": "1.77.0",
+    "@vscode-use/utils": "^0.1.47",
+    "@vscode/vsce": "^3.2.2",
+    "bumpp": "^9.11.1",
     "eslint": "^8.57.1",
     "esno": "^0.16.3",
-    "fast-glob": "^3.3.2",
+    "fast-glob": "^3.3.3",
     "lazy-js-utils": "^0.0.99",
     "pnpm": "^8.15.9",
     "rimraf": "^4.4.1",
     "tsup": "^6.7.0",
-    "typescript": "^5.6.2",
-    "typo-js": "^1.2.4",
+    "typescript": "^5.8.2",
+    "typo-js": "^1.2.5",
     "vitest": "^0.29.8"
   }
 }
