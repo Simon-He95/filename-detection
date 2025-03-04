@@ -2,7 +2,7 @@
   "publisher": "simonhe",
   "name": "filename-detection",
   "displayName": "File Name Detection",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "packageManager": "pnpm@8.15.9",
   "description": "filename-detection",
   "author": "Simon He <https://github.com/Simon-He95>",
