@@ -1,4 +1,4 @@
-import { basename, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { nextTick } from 'node:process'
 import fs from 'node:fs'
 import { addEventListener, createFakeProgress, createInput, createSelect, getConfiguration, getLocale, message, rename } from '@vscode-use/utils'
@@ -14,20 +14,22 @@ export async function activate(context: ExtensionContext) {
   const disposes: Disposable[] = []
   const lan = getLocale()
   const isZh = lan.includes('zh')
+  // NOTE: global regex + `.test()` is stateful; use a non-global regex for tests.
   const zero_character_reg = /\p{Cf}/gu
+  const zero_character_test_reg = /\p{Cf}/u
   const dictionary = new Typo('en_US')
-  const isCheck = getConfiguration('filename-detection.cSpell') as boolean
   const fixedNameFunc = async (files: any, isEdit = true) => {
     const suggestions = []
     const warningMsgs: string[] = [
       '🚨 文件或目录名中可能存在拼写错误：',
     ]
     const errorNamesCache = new Set()
+    const isCheck = getConfiguration('filename-detection.cSpell') as boolean
     // const isOneFile = files.length === 1
     for (const file of files) {
       const newUri = isEdit ? file.newUri : file
       let ext = basename(newUri.fsPath)
-      const dirPath = newUri.fsPath.substring(0, newUri.fsPath.length - ext.length)
+      const dirPath = dirname(newUri.fsPath)
 
       // 定义fixedName变量以确保在所有代码路径中都可用
       let fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
@@ -35,25 +37,25 @@ export async function activate(context: ExtensionContext) {
       // 检测是否需要处理父目录路径
       const checkPathSegments = () => {
         // 如果basename没有需要转换的问题，检查父路径是否有问题
-        if (!isContainCn(ext) && !zero_character_reg.test(ext) && !(/\s/.test(ext))) {
-          // 获取倒数第二级目录名
-          const parentDir = basename(dirPath.slice(0, -1)) // 移除尾部斜杠
-          if (parentDir && (isContainCn(parentDir) || zero_character_reg.test(parentDir) || /\s/.test(parentDir))) {
-            // 创建父目录的URI对象
-            const parentUri = Uri.file(dirPath.slice(0, -1))
+        if (!isContainCn(ext) && !zero_character_test_reg.test(ext) && !(/\s/.test(ext))) {
+          // 当前文件所在目录名
+          const currentDirName = basename(dirPath)
+          if (currentDirName && (isContainCn(currentDirName) || zero_character_test_reg.test(currentDirName) || /\s/.test(currentDirName))) {
+            // 创建当前目录的URI对象
+            const parentUri = Uri.file(dirPath)
 
             // 直接处理父目录，无需用户点击
-            if (isContainCn(parentDir)) {
+            if (isContainCn(currentDirName)) {
               // 处理中文目录名
-              handleChineseDirectory(parentUri, parentDir)
+              handleChineseDirectory(parentUri, currentDirName)
             }
-            else if (zero_character_reg.test(parentDir)) {
+            else if (zero_character_test_reg.test(currentDirName)) {
               // 处理带零宽字符的目录名
-              handleZeroWidthDirectory(parentUri, parentDir)
+              handleZeroWidthDirectory(parentUri, currentDirName)
             }
-            else if (/\s/.test(parentDir)) {
+            else if (/\s/.test(currentDirName)) {
               // 处理带空格的目录名
-              handleSpaceDirectory(parentUri, parentDir)
+              handleSpaceDirectory(parentUri, currentDirName)
             }
           }
         }
@@ -77,9 +79,7 @@ export async function activate(context: ExtensionContext) {
           // 提供驼峰和hyphen的选择
           const newDirName = await getNewExtName(exts)
           if (newDirName) {
-            // 获取父目录路径 - 这里是关键的修改点
-            const parentPath = uri.fsPath.substring(0, uri.fsPath.lastIndexOf('/')) // 找到父目录
-            const newPath = Uri.file(`${parentPath}/${newDirName}`) // 构建新路径
+            const newPath = Uri.file(join(dirname(uri.fsPath), newDirName))
 
             try {
               await rename(uri, newPath)
@@ -103,9 +103,7 @@ export async function activate(context: ExtensionContext) {
           buttons: isZh ? '修复' : 'Repair',
         }).then(async (v) => {
           if (v) {
-            // 获取父目录路径 - 这里是关键的修改点
-            const parentPath = uri.fsPath.substring(0, uri.fsPath.lastIndexOf('/')) // 找到父目录
-            const newPath = Uri.file(`${parentPath}/${fixedDirName}`) // 构建新路径
+            const newPath = Uri.file(join(dirname(uri.fsPath), fixedDirName))
 
             try {
               await rename(uri, newPath)
@@ -126,9 +124,7 @@ export async function activate(context: ExtensionContext) {
           buttons: isZh ? '修复' : 'Repair',
         }).then(async (v) => {
           if (v) {
-            // 获取父目录路径 - 这里是关键的修改点
-            const parentPath = uri.fsPath.substring(0, uri.fsPath.lastIndexOf('/')) // 找到父目录
-            const newPath = Uri.file(`${parentPath}/${fixedDirName}`) // 构建新路径
+            const newPath = Uri.file(join(dirname(uri.fsPath), fixedDirName))
 
             try {
               await rename(uri, newPath)
@@ -208,7 +204,7 @@ export async function activate(context: ExtensionContext) {
         ext = exactValue
         // 更新fixedName以确保拼写检查能正确工作
         fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
-        const newUrl = Uri.file((resolve(newUri.fsPath, '..', exactValue)))
+        const newUrl = Uri.file(join(dirPath, exactValue))
         nextTick(() => {
           rename(newUri, newUrl)
         })
@@ -229,7 +225,7 @@ export async function activate(context: ExtensionContext) {
           })
           return
         }
-        else if (zero_character_reg.test(ext)) {
+        else if (zero_character_test_reg.test(ext)) {
           message.error({
             message: `${ext} ${isZh ? '命名中存在零宽字符,是否自动修复删除空格？' : 'There are zero-width characters in the name, does it automatically repair and delete spaces?'}`,
             buttons: isZh ? '修复' : 'Repair',
@@ -285,7 +281,7 @@ export async function activate(context: ExtensionContext) {
       const userWords = (getConfiguration('cSpell.userWords') || []) as string[]
       const words = (getConfiguration('cSpell.words') || []) as string[]
       if (!isCheck)
-        return
+        continue
       const errorNames = prefixNames
         .filter(p => !dictionary.check(p) && !userWords.includes(p) && !words.includes(p) && ![...errorNamesCache].includes(p))
       if (!errorNames.length)
@@ -322,7 +318,7 @@ const translate = translateLoader()
 async function chineseToEnglish(name: string) {
   // 如果输入的名字是中文，则转换为英文，并提供几种组合选择
   if (!isContainCn(name)) {
-    return name
+    return [name]
   }
   return await translate(name, 'en')
 }
