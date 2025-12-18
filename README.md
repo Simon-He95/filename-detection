@@ -17,7 +17,7 @@ Detect the space string that may exist after the new file or file rename, give a
 
 ## License
 
-[MIT](./license)
+[MIT](./LICENSE)
 
 ## Sponsors
 

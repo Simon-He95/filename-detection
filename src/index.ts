@@ -1,30 +1,45 @@
+import type { Disposable, ExtensionContext } from 'vscode'
+import fs from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { nextTick } from 'node:process'
-import fs from 'node:fs'
+import translateLoader from '@simon_he/translate'
 import { addEventListener, createFakeProgress, createInput, createSelect, getConfiguration, getLocale, message, rename } from '@vscode-use/utils'
-import type { Disposable, ExtensionContext } from 'vscode'
-import { Uri } from 'vscode'
 import fg from 'fast-glob'
 import { camelize, isContainCn } from 'lazy-js-utils'
-import translateLoader from '@simon_he/translate'
+import { Uri } from 'vscode'
 
+// eslint-disable-next-line perfectionist/sort-imports
 const Typo = require('typo-js')
 
 export async function activate(context: ExtensionContext) {
   const disposes: Disposable[] = []
   const lan = getLocale()
   const isZh = lan.includes('zh')
+  const t = (zh: string, en: string) => isZh ? zh : en
   // NOTE: global regex + `.test()` is stateful; use a non-global regex for tests.
   const zero_character_reg = /\p{Cf}/gu
   const zero_character_test_reg = /\p{Cf}/u
-  const dictionary = new Typo('en_US')
+
+  let dictionary: any | undefined
+  const getDictionary = () => (dictionary ||= new Typo('en_US'))
+
+  const normalizeName = (name: string) => name.replace(/\s/g, '').replace(zero_character_reg, '')
+  const splitStemAndSuffix = (name: string) => {
+    const dotIndex = name.lastIndexOf('.')
+    if (dotIndex <= 0 || dotIndex === name.length - 1)
+      return { stem: name, suffix: '' }
+
+    return {
+      stem: name.slice(0, dotIndex),
+      suffix: name.slice(dotIndex),
+    }
+  }
+
   const fixedNameFunc = async (files: any, isEdit = true) => {
-    const suggestions = []
-    const warningMsgs: string[] = [
-      '🚨 文件或目录名中可能存在拼写错误：',
-    ]
-    const errorNamesCache = new Set()
-    const isCheck = getConfiguration('filename-detection.cSpell') as boolean
+    const suggestions: string[] = []
+    const warningMsgs: string[] = [t('🚨 文件或目录名中可能存在拼写错误：', '🚨 Potential spelling mistakes in file/folder name:')]
+    const errorNamesCache = new Set<string>()
+    const isCheck = getConfiguration('filename-detection.cSpell') === true
     // const isOneFile = files.length === 1
     for (const file of files) {
       const newUri = isEdit ? file.newUri : file
@@ -32,7 +47,12 @@ export async function activate(context: ExtensionContext) {
       const dirPath = dirname(newUri.fsPath)
 
       // 定义fixedName变量以确保在所有代码路径中都可用
-      let fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
+      let fixedName = normalizeName(ext)
+
+      const renameInSameDir = async (nextBaseName: string) => {
+        const nextUri = Uri.file(join(dirPath, nextBaseName))
+        await rename(newUri, nextUri)
+      }
 
       // 检测是否需要处理父目录路径
       const checkPathSegments = () => {
@@ -155,7 +175,7 @@ export async function activate(context: ExtensionContext) {
             if (/\s/.test(value))
               return '文件名不能包含空格'
 
-            if (zero_character_reg.test(value))
+            if (zero_character_test_reg.test(value))
               return '文件名不能包含零宽字符'
 
             if (entry.includes(value + suffix))
@@ -203,38 +223,43 @@ export async function activate(context: ExtensionContext) {
         const exactValue = newName ? newName + suffix : ext
         ext = exactValue
         // 更新fixedName以确保拼写检查能正确工作
-        fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
+        fixedName = normalizeName(ext)
         const newUrl = Uri.file(join(dirPath, exactValue))
         nextTick(() => {
           rename(newUri, newUrl)
         })
       }
       else {
-        const fixedName = ext.replace(/\s/g, '').replace(zero_character_reg, '')
         if (/\s/.test(ext)) {
           message.error({
-            message: `${ext} ${isZh ? '命名中存在空格,是否自动修复删除空格？' : 'If there is a space in the name, will the space be automatically repaired and deleted?'}`,
+            message: `${ext} ${t('命名中存在空格,是否自动修复删除空格？', 'There are spaces in the name, auto fix (remove spaces)?')}`,
             buttons: isZh ? '修复' : 'Repair',
           }).then(async (v) => {
             if (v) {
-              rename(newUri, Uri.file(newUri.fsPath.replace(ext, fixedName)))
-                .then(() => {
-                  message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${fixedName}]`)
-                })
+              try {
+                await renameInSameDir(fixedName)
+                message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${fixedName}]`)
+              }
+              catch (error) {
+                message.error(`${t('重命名文件失败', 'Failed to rename file')}: ${String(error)}`)
+              }
             }
           })
           return
         }
         else if (zero_character_test_reg.test(ext)) {
           message.error({
-            message: `${ext} ${isZh ? '命名中存在零宽字符,是否自动修复删除空格？' : 'There are zero-width characters in the name, does it automatically repair and delete spaces?'}`,
+            message: `${ext} ${t('命名中存在零宽字符,是否自动修复删除零宽字符？', 'There are zero-width characters in the name, auto fix (remove zero-width characters)?')}`,
             buttons: isZh ? '修复' : 'Repair',
           }).then(async (v) => {
             if (v) {
-              rename(newUri, Uri.file(newUri.fsPath.replace(ext, fixedName)))
-                .then(() => {
-                  message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${fixedName}]`)
-                })
+              try {
+                await renameInSameDir(fixedName)
+                message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${fixedName}]`)
+              }
+              catch (error) {
+                message.error(`${t('重命名文件失败', 'Failed to rename file')}: ${String(error)}`)
+              }
             }
           })
           return
@@ -251,15 +276,20 @@ export async function activate(context: ExtensionContext) {
             message: increment => `当前进度 ${increment}%`,
           })
           try {
-            const exts = (await chineseToEnglish(ext))[0].split(' ').map(item => item.toLocaleLowerCase())
+            const { stem, suffix } = splitStemAndSuffix(ext)
+            const exts = (await chineseToEnglish(stem))[0].split(' ').map(item => item.toLocaleLowerCase())
             resolver(true)
             // 提供驼峰和hyphen的选择
             const newExtName = await getNewExtName(exts)
             if (newExtName) {
-              rename(newUri, Uri.file(newUri.fsPath.replace(ext, newExtName)))
-                .then(() => {
-                  message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${newExtName}]`)
-                })
+              const nextBaseName = `${newExtName}${suffix}`
+              try {
+                await renameInSameDir(nextBaseName)
+                message.info(`${isZh ? '已将文件名' : 'The file name has been'}：[${ext}] -> [${nextBaseName}]`)
+              }
+              catch (error) {
+                message.error(`${t('重命名文件失败', 'Failed to rename file')}: ${String(error)}`)
+              }
             }
           }
           catch (error) {
@@ -275,17 +305,16 @@ export async function activate(context: ExtensionContext) {
       }
 
       const splitNames = fixedName.split('.')
-      const prefixNames = splitNames[0].includes('-')
-        ? splitNames[0].split('-')
-        : splitNames[0].split('_')
+      const prefixNames = splitNames[0].split(/[-_]+/).filter(Boolean)
       const userWords = (getConfiguration('cSpell.userWords') || []) as string[]
       const words = (getConfiguration('cSpell.words') || []) as string[]
       if (!isCheck)
         continue
+      const dictionary = getDictionary()
       const errorNames = prefixNames
-        .filter(p => !dictionary.check(p) && !userWords.includes(p) && !words.includes(p) && ![...errorNamesCache].includes(p))
+        .filter(p => !dictionary.check(p) && !userWords.includes(p) && !words.includes(p) && !errorNamesCache.has(p))
       if (!errorNames.length)
-        return
+        continue
 
       errorNames.forEach(n => errorNamesCache.add(n))
       // 读取 cSpell.userWords 和 cSpell.words
@@ -293,7 +322,10 @@ export async function activate(context: ExtensionContext) {
         const array_of_suggestions = dictionary.suggest(p)
           .filter((s: string) => !p.toLocaleLowerCase().includes(s.toLocaleLowerCase()))
         suggestions.push(...array_of_suggestions)
-        warningMsgs.push(`💡 ${p} 建议修正为：${array_of_suggestions.join(', ')}`)
+        warningMsgs.push(t(
+          `💡 ${p} 建议修正为：${array_of_suggestions.join(', ')}`,
+          `💡 ${p} suggestions: ${array_of_suggestions.join(', ')}`,
+        ))
       })
     }
 
@@ -337,7 +369,7 @@ async function getNewExtName(exts: string[]) {
 
   return selectOptions.length > 1
     ? await createSelect(selectOptions, {
-      title: '请选择需要的命名',
-    })
+        title: '请选择需要的命名',
+      })
     : selectOptions[0]
 }
